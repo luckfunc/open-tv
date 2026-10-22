@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="redesign_settings">设置</string>
+    <string name="redesign_launcher">桌面接管</string>
+    <string name="redesign_phone">手机设置</string>
+    <string name="redesign_categories">返回分类</string>
+</resources>

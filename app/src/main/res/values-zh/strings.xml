@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenTV</string>
+    <string name="guard_name">OpenTV 桌面守护</string>
+    <string name="st_home_filter">持续过滤主页键</string>
+    <string name="st_home_filter_off">关闭（默认）</string>
+    <string name="st_home_filter_on">开启</string>
+    <string name="st_home_filter_warning">实验性功能，需要开启桌面守护。跨 App 保持主页键过滤，可尝试减少 Android 12 及以上系统按主页键时原桌面的闪现。所有按键都会经过无障碍服务，部分 App 可能出现按一次响应两次。部分固件不会将主页键交给无障碍服务，开启后仍可能闪现；关闭即可恢复原有过滤方式。</string>
+    <string name="guard_description">在不允许更换桌面的电视上，让 OpenTV 保持为主屏幕。不会读取任何屏幕内容。</string>
+
+    <string name="greeting_morning">早上好</string>
+    <string name="greeting_afternoon">下午好</string>
+    <string name="greeting_evening">晚上好</string>
+
+    <string name="cc_title">控制中心</string>
+    <string name="cc_network">网络</string>
+    <string name="cc_settings">设置</string>
+    <string name="cc_hidden_apps">隐藏的 App</string>
+    <string name="cc_back">返回</string>
+
+    <string name="net_ethernet">有线网络</string>
+    <string name="net_wifi">Wi-Fi</string>
+    <string name="net_offline">未连接</string>
+
+    <string name="input_live_tv">电视直播</string>
+    <string name="input_antenna">模拟电视</string>
+    <string name="input_digital">数字电视</string>
+    <string name="input_av">AV</string>
+
+    <string name="menu_move">移动</string>
+    <string name="menu_hide">从主屏幕隐藏</string>
+    <string name="menu_info">应用信息</string>
+    <string name="menu_reset_icon">恢复默认图标</string>
+    <string name="menu_uninstall">卸载</string>
+    <string name="move_hint">正在移动「%1$s」 · 方向键调整 · 确定保存 · 返回取消</string>
+    <string name="move_hint_touch">正在移动「%1$s」 · 方向键或点选位置 · 确定保存 · 返回取消</string>
+
+    <string name="hidden_title">隐藏的 App</string>
+    <string name="hidden_hint">选择一个 App 放回主屏幕</string>
+    <string name="hidden_empty">没有隐藏的 App</string>
+
+    <string name="launch_failed">无法打开%1$s</string>
+    <string name="unavailable">此电视不支持</string>
+    <string name="cc_personalize">个性化</string>
+    <string name="wp_title">个性化</string>
+    <string name="wp_wallpaper">壁纸</string>
+    <string name="wp_daily">每日精选</string>
+    <string name="wp_daily_latest">每日自动更新</string>
+    <string name="wp_builtin">内置</string>
+    <string name="wp_photos">我的照片</string>
+    <string name="wp_photos_rotate">每天换一张</string>
+    <string name="phone_subtitle">电视个性化</string>
+    <string name="wp_phone_title">用手机设置</string>
+    <string name="wp_phone_body">扫码后在手机上发照片当壁纸、更换 App 图标。手机和电视需连接同一网络。</string>
+    <string name="wp_phone_offline">电视联网后即可用手机设置。</string>
+    <string name="menu_unpin_source">从主屏幕移除</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="redesign_settings">Settings</string>
+    <string name="redesign_launcher">Launcher</string>
+    <string name="redesign_phone">Phone companion</string>
+    <string name="redesign_categories">Back to categories</string>
+</resources>

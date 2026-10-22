@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Open-screen mark; keep geometry aligned with docs/brand/icon.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M64 40 H42 Q33 40 33 49 V62 Q33 71 42 71 H64 Q73 71 73 62 V51" android:fillColor="#00000000"
+        android:strokeColor="#FF141414" android:strokeWidth="7" android:strokeLineCap="round" />
+    <path android:pathData="M72 32 H77 Q79 32 79 34 V39 Q79 41 77 41 H72 Q70 41 70 39 V34 Q70 32 72 32 Z" android:fillColor="#FF141414" />
+</vector>

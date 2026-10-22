@@ -1,0 +1,15 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# Private signing keys, device addresses, screenshots, backups and household data.
+local/
+
+# Local engineering notes and agent instructions; README and licenses stay public.
+/docs/
+/AGENTS.md
+/CLAUDE.md

@@ -1,0 +1,12 @@
+OpenTV modifications are copyright (c) 2026 luckfunc and released under the MIT License.
+Project repository: https://github.com/luckfunc/open-tv
+
+OpenTV contains code derived from Aerial (https://github.com/pengchujin/aerial-tv).
+Original copyright: Copyright (c) 2026 pengchujin.
+The original MIT copyright and permission notice are retained in LICENSE.
+
+OpenTV has an independent product name, Android application identity, visual assets,
+and local signing key. It is not an official release or an update channel of the
+original project. Removing Git history does not remove license obligations.
+
+Inter font: see FONT-LICENSE-OFL.txt.

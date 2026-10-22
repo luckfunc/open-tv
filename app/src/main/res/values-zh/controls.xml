@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cc_about">关于 OpenTV</string>
+    <string name="cc_system_home">退出桌面</string>
+</resources>

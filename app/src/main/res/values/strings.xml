@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenTV</string>
+    <string name="guard_name">OpenTV Home Guard</string>
+    <string name="st_home_filter">Home key filtering</string>
+    <string name="st_home_filter_off">Off (default)</string>
+    <string name="st_home_filter_on">On</string>
+    <string name="st_home_filter_warning">Experimental; requires Home Guard. Keeps Home filtering enabled across apps. May reduce stock launcher flashes on Android 12+. All keys pass through accessibility and some apps may receive duplicate key presses. Some firmware does not deliver Home to accessibility, so flashes may remain. Turn off to restore normal filtering.</string>
+    <string name="guard_description">Keeps OpenTV as your home screen on TVs that do not let you change it. Reads no screen content.</string>
+
+    <string name="greeting_morning">Good morning</string>
+    <string name="greeting_afternoon">Good afternoon</string>
+    <string name="greeting_evening">Good evening</string>
+
+    <string name="cc_title">Control Center</string>
+    <string name="cc_network">Network</string>
+    <string name="cc_settings">Settings</string>
+    <string name="cc_hidden_apps">Hidden Apps</string>
+    <string name="cc_back">Back</string>
+
+    <string name="net_ethernet">Ethernet</string>
+    <string name="net_wifi">Wi-Fi</string>
+    <string name="net_offline">Not Connected</string>
+
+    <string name="input_live_tv">Live TV</string>
+    <string name="input_antenna">Antenna</string>
+    <string name="input_digital">Digital TV</string>
+    <string name="input_av">AV</string>
+
+    <string name="menu_move">Move</string>
+    <string name="menu_hide">Hide from Home</string>
+    <string name="menu_reset_icon">Restore Default Icon</string>
+    <string name="menu_info">App Info</string>
+    <string name="menu_uninstall">Uninstall</string>
+    <string name="move_hint">Moving %1$s · Arrows to position · OK to save · Back to cancel</string>
+    <string name="move_hint_touch">Moving %1$s · Arrows or tap a position · OK to save · Back to cancel</string>
+
+    <string name="hidden_title">Hidden Apps</string>
+    <string name="hidden_hint">Select an app to put it back on Home</string>
+    <string name="hidden_empty">No hidden apps</string>
+
+    <string name="launch_failed">Couldn\'t open %1$s</string>
+    <string name="unavailable">Not available on this TV</string>
+    <string name="cc_personalize">Personalize</string>
+    <string name="wp_title">Personalize</string>
+    <string name="wp_wallpaper">Wallpaper</string>
+    <string name="wp_daily">Daily Photos</string>
+    <string name="wp_daily_latest">Always Today\'s</string>
+    <string name="wp_builtin">Built-in</string>
+    <string name="wp_photos">My Photos</string>
+    <string name="wp_photos_rotate">One a Day</string>
+    <string name="phone_subtitle">TV personalization</string>
+    <string name="wp_phone_title">Set up with your phone</string>
+    <string name="wp_phone_body">Scan to send photos as wallpapers, change app icons from your phone. Phone and TV must be on the same network.</string>
+    <string name="wp_phone_offline">Connect the TV to a network to set up with your phone.</string>
+    <string name="menu_unpin_source">Remove from Home</string>
+</resources>
