@@ -1,4 +1,9 @@
-<p align="center"><img src="assets/brand/wordmark.png" width="320" alt="OpenTV"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/wordmark-dark.svg">
+    <img src="assets/brand/wordmark.svg" width="320" alt="OpenTV">
+  </picture>
+</p>
 
 # OpenTV
 
