@@ -6,6 +6,11 @@ import app.opentv.launcher.setup.AdbConnector
 import app.opentv.launcher.setup.AdbFailure
 import app.opentv.launcher.setup.AdbFailureReason
 import app.opentv.launcher.setup.AdbSession
+import app.opentv.launcher.setup.SetupDiagnostics
+import app.opentv.launcher.setup.DiagnosticStage
+import app.opentv.launcher.setup.DiagnosticEvent
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -25,8 +30,9 @@ internal class AndroidAdbConnector internal constructor(
     private val port: Int = 5555,
     private val authorizationTimeoutMillis: Long = 60_000,
     private val socketFactory: () -> Socket = { Socket() },
+    private val diagnostic: SetupDiagnostics.Attempt? = null,
 ) : AdbConnector {
-    constructor(context: Context) : this({ AdbIdentity.load(context.applicationContext) })
+    constructor(context: Context, diagnostic: SetupDiagnostics.Attempt? = null) : this({ AdbIdentity.load(context.applicationContext) }, diagnostic = diagnostic)
 
     private val lock = Any()
     private var closed = false
@@ -42,7 +48,12 @@ internal class AndroidAdbConnector internal constructor(
     }
 
     private suspend fun connectOnIo(onAuthorizationRequested: () -> Unit): AdbSession = withContext(Dispatchers.IO) {
-        val key = identity()
+        diagnostic?.record(DiagnosticStage.Identity, DiagnosticEvent.Started)
+        val key = try { identity() } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            throw AdbFailure(AdbFailureReason.IdentityUnavailable, e)
+        }
+        diagnostic?.record(DiagnosticStage.Identity, DiagnosticEvent.Completed)
         coroutineContext.ensureActive()
         val socket = socketFactory()
         synchronized(lock) {
@@ -54,12 +65,15 @@ internal class AndroidAdbConnector internal constructor(
         }
         var connected = false
         val deadline = deadlineAfter(authorizationTimeoutMillis)
-        val reason = AdbFailureReason.AuthorizationTimeout
+        var reason = AdbFailureReason.HandshakeTimeout
         val guard = AdbIoDeadline(socket, deadline, coroutineContext)
         try {
             socket.soTimeout = 100
             socket.tcpNoDelay = true
+            diagnostic?.record(DiagnosticStage.Connection, DiagnosticEvent.Started)
             socket.connect(InetSocketAddress("127.0.0.1", port), 250)
+            diagnostic?.record(DiagnosticStage.Connection, DiagnosticEvent.Connected)
+            diagnostic?.record(DiagnosticStage.Handshake, DiagnosticEvent.Started)
             connected = true
             val wire = AdbWire(socket)
             wire.send(AdbPacket(AdbProtocol.CNXN, 0x01000000, AdbProtocol.MAX_PAYLOAD, "host::\u0000".toByteArray()), deadline, coroutineContext, reason)
@@ -68,15 +82,19 @@ internal class AndroidAdbConnector internal constructor(
                 val packet = wire.receive(deadline, coroutineContext, reason)
                 when (packet.command) {
                     AdbProtocol.CNXN -> {
+                        diagnostic?.record(DiagnosticStage.Handshake, DiagnosticEvent.Cnxn)
                         if (packet.arg0 < 0x01000000 || packet.arg1 <= 0) protocolError()
                         return@withContext SocketAdbSession(socket, wire) { release(socket) }
                     }
                     AdbProtocol.AUTH -> {
+                        diagnostic?.record(DiagnosticStage.Handshake, DiagnosticEvent.Auth)
                         if (packet.arg0 != 1 || packet.arg1 != 0 || packet.payload.size != 20) protocolError()
                         when (auth++) {
                             0 -> wire.send(AdbPacket(AdbProtocol.AUTH, 2, 0, key.sign(packet.payload)), deadline, coroutineContext, reason)
                             1 -> {
                                 wire.send(AdbPacket(AdbProtocol.AUTH, 3, 0, key.publicPayload()), deadline, coroutineContext, reason)
+                                reason = AdbFailureReason.AuthorizationTimeout
+                                diagnostic?.record(DiagnosticStage.Authorization, DiagnosticEvent.KeySent)
                                 onAuthorizationRequested()
                             }
                             else -> protocolError()
@@ -89,11 +107,21 @@ internal class AndroidAdbConnector internal constructor(
             error("unreachable")
         } catch (failure: Throwable) {
             release(socket)
-            checkDeadline(deadline, coroutineContext, reason)
+            coroutineContext.ensureActive()
+            if (System.nanoTime() >= deadline) throw AdbFailure(reason, failure)
+            if (failure is AdbFailure && failure.reason == AdbFailureReason.TlsRequired) {
+                diagnostic?.record(DiagnosticStage.Handshake, DiagnosticEvent.Stls)
+            }
             when (failure) {
                 is CancellationException -> throw failure
                 is AdbFailure -> throw failure
-                else -> throw AdbFailure(if (connected) AdbFailureReason.Disconnected else AdbFailureReason.Unavailable)
+                else -> throw AdbFailure(when {
+                    connected -> AdbFailureReason.Disconnected
+                    failure is SocketTimeoutException -> AdbFailureReason.ConnectionTimeout
+                    failure is SecurityException || failure.cause.let { it is android.system.ErrnoException && it.errno in setOf(android.system.OsConstants.EACCES, android.system.OsConstants.EPERM) } -> AdbFailureReason.ConnectionDenied
+                    failure is ConnectException && (failure.message?.contains("Connection refused", true) == true || failure.cause.let { it is android.system.ErrnoException && it.errno == android.system.OsConstants.ECONNREFUSED }) -> AdbFailureReason.ConnectionRefused
+                    else -> AdbFailureReason.Unavailable
+                }, failure)
             }
         } finally {
             guard.close()
@@ -171,11 +199,12 @@ private class SocketAdbSession(
                 error("unreachable")
             } catch (failure: Throwable) {
                 close()
-                checkDeadline(deadline, context, reason)
+                context.ensureActive()
+                if (System.nanoTime() >= deadline) throw AdbFailure(reason, failure)
                 when (failure) {
                     is CancellationException -> throw failure
                     is AdbFailure -> throw failure
-                    else -> throw AdbFailure(AdbFailureReason.Disconnected)
+                    else -> throw AdbFailure(AdbFailureReason.Disconnected, failure)
                 }
             } finally {
                 guard.close()

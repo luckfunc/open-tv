@@ -15,6 +15,7 @@ import app.opentv.launcher.apps.ReorderSession
 import app.opentv.launcher.apps.sourceEntry
 import app.opentv.launcher.settings.OpenTvSettings
 import app.opentv.launcher.setup.SetupController
+import app.opentv.launcher.setup.AndroidSetupDiagnostics
 import app.opentv.launcher.setup.AndroidSetupEnvironment
 import app.opentv.launcher.setup.SetupReturn
 import app.opentv.launcher.setup.SetupState
@@ -58,10 +59,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     var homeResetPending by mutableStateOf(false)
 
+    private val setupDiagnostics = AndroidSetupDiagnostics.get(app)
     internal val setup = SetupController(
         viewModelScope,
-        { AndroidAdbConnector(context) },
+        { AndroidAdbConnector(context, setupDiagnostics.current) },
         AndroidSetupEnvironment(app),
+        setupDiagnostics,
     )
 
     internal fun openSetup() {

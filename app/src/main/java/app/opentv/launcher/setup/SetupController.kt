@@ -52,6 +52,7 @@ internal class SetupController(
     private val scope: CoroutineScope,
     private val connectorFactory: () -> AdbConnector,
     private val environment: SetupEnvironment,
+    private val diagnostics: SetupDiagnostics? = null,
 ) : Closeable {
     private val mutableState = MutableStateFlow<SetupState>(
         if (environment.acknowledged()) SetupState.Closed else SetupState.Intro(environment.nativeHome()),
@@ -63,6 +64,7 @@ internal class SetupController(
     private var connector: AdbConnector? = null
     private var session: AdbSession? = null
     private var generation = 0
+    private var diagnostic: SetupDiagnostics.Attempt? = null
     private var before: SetupSnapshot? = null
     private val outcomes = linkedMapOf<SetupOperation, SetupOutcome>()
 
@@ -95,6 +97,8 @@ internal class SetupController(
         before = null
         mutableState.value = SetupState.Checking()
         val token = generation
+        val attempt = diagnostics?.start()
+        diagnostic = attempt
         job = scope.launch {
             var connectionEstablished = false
             try {
@@ -118,19 +122,24 @@ internal class SetupController(
                 environment.trace("connect established")
                 connectionEstablished = true
                 session = connected
+                attempt?.record(DiagnosticStage.Read, DiagnosticEvent.Started, DiagnosticCheck.ShellIdentity)
                 val identity = connected.execute("id -u")
+                attempt?.record(DiagnosticStage.Read, DiagnosticEvent.Completed, DiagnosticCheck.ShellIdentity, exitCode = identity.exitCode)
                 if (identity.exitCode != 0 || identity.output.trim() != "2000") throw AdbFailure(AdbFailureReason.ProtocolError)
                 val snapshot = environment.snapshot(connected)
                 coroutineContext.ensureActive()
                 if (token == generation) {
                     before = snapshot
                     environment.trace("Review configured=${snapshot.configured} guardBound=${snapshot.guardBound} listenerBound=${snapshot.listenerBound}")
+                    attempt?.record(DiagnosticStage.Verify, DiagnosticEvent.Review, guardBound = snapshot.guardBound, listenerBound = snapshot.listenerBound)
                     mutableState.value = SetupState.Review(snapshot, environment.legacyBehaviors())
                 }
             } catch (cancelled: CancellationException) {
+                attempt?.record(attempt.stage, DiagnosticEvent.Cancelled)
                 environment.trace("check cancelled", cancelled)
                 throw cancelled
             } catch (error: Exception) {
+                attempt?.record(attempt.stage, DiagnosticEvent.Failed, failure = error)
                 environment.trace("check failed", error)
                 if (token == generation) {
                     release()
@@ -143,6 +152,7 @@ internal class SetupController(
     fun confirm() {
         val review = mutableState.value as? SetupState.Review ?: return
         val connected = session ?: return
+        val attempt = diagnostic
         val token = generation
         environment.trace("confirm start")
         mutableState.value = SetupState.Applying(SetupOperation.SecureSettings, emptyMap())
@@ -155,6 +165,15 @@ internal class SetupController(
                 before = initial
                 environment.journal(initial, outcomes.toMap())
                 for (operation in SetupOperation.entries) {
+                    attempt?.record(DiagnosticStage.Configure, DiagnosticEvent.Started,
+                        when (operation) {
+                            SetupOperation.ServiceAccess -> DiagnosticCheck.RestrictedSettings
+                            SetupOperation.SecureSettings -> DiagnosticCheck.SecureSettings
+                            SetupOperation.Overlay -> DiagnosticCheck.Overlay
+                            SetupOperation.Notification -> DiagnosticCheck.Notification
+                            SetupOperation.HomeGuard -> DiagnosticCheck.HomeGuard
+                            SetupOperation.AutoStart -> DiagnosticCheck.AutoStart
+                        })
                     environment.trace("operation=$operation start")
                     coroutineContext.ensureActive()
                     if (operation.optional &&
@@ -176,6 +195,15 @@ internal class SetupController(
                             else -> SetupOutcome.Failed
                         }
                     }
+                    attempt?.record(DiagnosticStage.Configure, DiagnosticEvent.Completed,
+                        when (operation) {
+                            SetupOperation.ServiceAccess -> DiagnosticCheck.RestrictedSettings
+                            SetupOperation.SecureSettings -> DiagnosticCheck.SecureSettings
+                            SetupOperation.Overlay -> DiagnosticCheck.Overlay
+                            SetupOperation.Notification -> DiagnosticCheck.Notification
+                            SetupOperation.HomeGuard -> DiagnosticCheck.HomeGuard
+                            SetupOperation.AutoStart -> DiagnosticCheck.AutoStart
+                        }, outcome = outcomes[operation])
                     environment.trace("operation=$operation outcome=${outcomes[operation]}")
                     environment.journal(initial, outcomes.toMap())
                     if (operation == SetupOperation.SecureSettings && outcomes[operation] == SetupOutcome.Failed) break
@@ -200,11 +228,16 @@ internal class SetupController(
                     environment.journal(initial, outcomes.toMap())
                 }
                 environment.trace("final outcomes=$outcomes configured=${actual.configured} guardBound=${actual.guardBound} listenerBound=${actual.listenerBound}")
+                attempt?.record(DiagnosticStage.Verify, DiagnosticEvent.Result,
+                    hint = if (outcomes.values.any { it == SetupOutcome.Failed || it == SetupOutcome.Uncertain }) DiagnosticHint.Other else null,
+                    guardBound = actual.guardBound, listenerBound = actual.listenerBound, configured = actual.configured)
                 if (token == generation) mutableState.value = SetupState.Result(SetupReport(outcomes.toMap(), actual))
             } catch (cancelled: CancellationException) {
+                attempt?.record(attempt.stage, DiagnosticEvent.Cancelled)
                 environment.trace("confirm cancelled operation=${(mutableState.value as? SetupState.Applying)?.operation}", cancelled)
                 throw cancelled
             } catch (error: Exception) {
+                attempt?.record(attempt.stage, DiagnosticEvent.Failed, failure = error)
                 environment.trace("confirm failed operation=${(mutableState.value as? SetupState.Applying)?.operation}", error)
                 if (token == generation) mutableState.value = SetupState.Result(SetupReport(outcomes.toMap()))
             } finally {
@@ -216,6 +249,7 @@ internal class SetupController(
     fun cancel() {
         environment.trace("cancel state=${mutableState.value.javaClass.simpleName}")
         val applying = mutableState.value is SetupState.Applying
+        diagnostic?.let { it.record(it.stage, DiagnosticEvent.Cancelled) }
         stop()
         if (applying) {
             before?.let {
@@ -234,6 +268,7 @@ internal class SetupController(
     }
 
     private fun stop() {
+        diagnostic?.let { it.record(it.stage, DiagnosticEvent.Interrupted) }
         generation++
         job?.cancel()
         job = null

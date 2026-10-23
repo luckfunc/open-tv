@@ -15,7 +15,21 @@ internal data class AdbCommandResult(val output: String, val exitCode: Int)
 
 internal enum class AdbFailureReason {
     Unavailable, AuthorizationTimeout, TlsRequired, Disconnected, ProtocolError,
-    CommandTimeout, IdentityUnavailable,
+    CommandTimeout, IdentityUnavailable, ConnectionRefused, ConnectionTimeout, ConnectionDenied, HandshakeTimeout,
 }
 
-internal class AdbFailure(val reason: AdbFailureReason) : IOException(reason.name)
+internal val AdbFailureReason.code: String get() = when (this) {
+    AdbFailureReason.ConnectionRefused -> "C01"
+    AdbFailureReason.ConnectionTimeout -> "C02"
+    AdbFailureReason.ConnectionDenied -> "C03"
+    AdbFailureReason.Unavailable -> "C04"
+    AdbFailureReason.HandshakeTimeout -> "H01"
+    AdbFailureReason.TlsRequired -> "H02"
+    AdbFailureReason.ProtocolError -> "H03"
+    AdbFailureReason.AuthorizationTimeout -> "A01"
+    AdbFailureReason.Disconnected -> "C05"
+    AdbFailureReason.CommandTimeout -> "R01"
+    AdbFailureReason.IdentityUnavailable -> "I01"
+}
+
+internal class AdbFailure(val reason: AdbFailureReason, cause: Throwable? = null) : IOException(reason.name, cause)

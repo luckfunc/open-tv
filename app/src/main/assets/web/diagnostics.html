@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenTV · {{TITLE}}</title>
+<style>
+body { max-width: 760px; margin: 32px auto; padding: 0 20px; background: #15171b; color: #f5f5f7; font: 16px/1.5 system-ui, sans-serif; }
+h1 { font-size: 25px; }
+p { color: #c4c6cc; }
+nav { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+button, a { display: inline-block; padding: 12px 18px; border: 0; border-radius: 10px; background: #e9edf5; color: #17191d; font: inherit; text-decoration: none; }
+textarea { box-sizing: border-box; width: 100%; height: 60vh; padding: 14px; border: 1px solid #555; border-radius: 10px; background: #22252c; color: #f5f5f7; font: 13px/1.6 monospace; }
+</style></head><body>
+<h1>OpenTV · {{TITLE}}</h1><p>{{PRIVACY}}</p>
+<nav><button id="copy">{{COPY}}</button><a href="diagnostics.txt" download>{{DOWNLOAD}}</a></nav>
+<p id="status" role="status" data-copied="{{COPIED}}" data-select="{{SELECT}}"></p>
+<textarea id="report" readonly aria-label="{{TITLE}}">{{REPORT}}</textarea>
+<script>
+document.getElementById('copy').addEventListener('click', async () => {
+  const report = document.getElementById('report');
+  const status = document.getElementById('status');
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(report.value);
+    } else {
+      report.focus(); report.select(); report.setSelectionRange(0, report.value.length);
+      if (!document.execCommand('copy')) throw new Error('Select text');
+    }
+    status.textContent = status.dataset.copied;
+  } catch (_) {
+    report.focus(); report.select(); report.setSelectionRange(0, report.value.length);
+    status.textContent = status.dataset.select;
+  }
+});
+</script></body></html>

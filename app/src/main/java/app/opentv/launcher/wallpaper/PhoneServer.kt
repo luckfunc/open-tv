@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.ConnectivityManager
 import app.opentv.launcher.R
+import app.opentv.launcher.setup.AndroidSetupDiagnostics
 import android.util.Log
 import androidx.core.content.getSystemService
 import app.opentv.launcher.apps.AppCatalog
@@ -87,7 +88,23 @@ class PhoneServer internal constructor(
     private fun route(session: IHTTPSession): Response {
         val prefix = "/$token"
         val uri = session.uri
-        if (!uri.startsWith(prefix)) return text(Response.Status.NOT_FOUND, "Not found")
+        if (uri.startsWith("/diagnostic-export/")) {
+            val parts = uri.removePrefix("/diagnostic-export/").split('/')
+            if (parts.size != 2 || parts[1] !in setOf("diagnostics", "diagnostics.txt")) return text(Response.Status.NOT_FOUND, "Not found")
+            val path = parts[1]
+            if (session.method != Method.GET) return text(Response.Status.METHOD_NOT_ALLOWED, "GET required")
+            val report = AndroidSetupDiagnostics.sharedReport(parts[0]) ?: return text(Response.Status.NOT_FOUND, "Report not shared or expired")
+            return if (path.endsWith(".txt")) newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", report).apply {
+                addHeader("Content-Disposition", "attachment; filename=opentv-diagnostics.txt")
+                addHeader("Cache-Control", "no-store")
+            } else newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", diagnosticPage(report)).apply {
+                addHeader("Cache-Control", "no-store")
+                addHeader("Referrer-Policy", "no-referrer")
+                addHeader("X-Content-Type-Options", "nosniff")
+                addHeader("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'")
+            }
+        }
+        if (uri != prefix && !uri.startsWith("$prefix/")) return text(Response.Status.NOT_FOUND, "Not found")
         val path = uri.removePrefix(prefix).ifEmpty { "/" }
         return runCatching {
             when {
@@ -121,6 +138,18 @@ class PhoneServer internal constructor(
             Log.w(TAG, "request failed", it)
             text(Response.Status.INTERNAL_ERROR, "error")
         }
+    }
+
+    private fun diagnosticPage(report: String): String {
+        fun escape(value: String): String = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+        return context.assets.open("web/diagnostics.html").bufferedReader().use { it.readText() }
+            .replace("{{TITLE}}", escape(context.getString(R.string.setup_diagnostics)))
+            .replace("{{PRIVACY}}", escape(context.getString(R.string.setup_diagnostic_privacy)))
+            .replace("{{COPY}}", escape(context.getString(R.string.setup_diagnostic_copy)))
+            .replace("{{DOWNLOAD}}", escape(context.getString(R.string.setup_diagnostic_download)))
+            .replace("{{COPIED}}", escape(context.getString(R.string.setup_diagnostic_copied)))
+            .replace("{{SELECT}}", escape(context.getString(R.string.setup_diagnostic_select)))
+            .replace("{{REPORT}}", escape(report))
     }
 
     private fun page(): String = context.assets.open("web/index.html").bufferedReader().use { it.readText() }

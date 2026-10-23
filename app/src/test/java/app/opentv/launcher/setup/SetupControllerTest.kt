@@ -60,6 +60,30 @@ class SetupControllerTest {
         override fun close() { closed = true }
     }
 
+    @Test fun failedCheckCanBeReportedWithoutGrantingPermissionsAndRetryHasNewIdentity() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("opentv-setup-test").toFile()
+        val diagnostics = SetupDiagnostics(dir, emptyMap())
+        val environment = Environment().apply { snapshotFailure = AdbFailure(AdbFailureReason.CommandTimeout) }
+        val controller = SetupController(this, { Connector() }, environment, diagnostics)
+        controller.check()
+        runCurrent()
+        val failed = diagnostics.current!!
+        val report = diagnostics.latestReport()!!
+        assertTrue(report.contains("R01"))
+        assertTrue(environment.writes.isEmpty())
+        environment.snapshotFailure = null
+        controller.check()
+        runCurrent()
+        assertNotEquals(failed.id, diagnostics.current!!.id)
+        assertEquals(report, failed.report())
+        assertTrue(controller.state.value is SetupState.Review)
+        assertTrue(environment.writes.isEmpty())
+        controller.cancel()
+        assertTrue(diagnostics.latestReport()!!.contains("Cancelled"))
+        diagnostics.awaitWrites()
+        dir.deleteRecursively()
+    }
+
     @Test fun firstOpenSkipAndSettingsReopenHaveExplicitDestinations() = runTest {
         val environment = Environment()
         val controller = SetupController(this, { Connector() }, environment)

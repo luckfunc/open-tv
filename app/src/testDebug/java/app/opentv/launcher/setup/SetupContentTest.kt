@@ -169,6 +169,35 @@ class SetupContentTest {
         assertEquals(0, writes)
     }
 
+    @Test fun failedConnectionOffersDiagnosisWithoutRetryingOrWriting() {
+        var checks = 0
+        var writes = 0
+        var diagnostics = 0
+        compose.setContent { SetupContent(SetupState.Blocked(AdbFailureReason.ConnectionRefused),
+            { checks++ }, { writes++ }, {}, {}, {}, { diagnostics++ }) }
+        focusWindow(true)
+        compose.onNodeWithText(compose.activity.getString(R.string.setup_error_code, "C01")).assertExists()
+        row(R.string.setup_diagnostics).performTouchInput { click() }
+        assertEquals(1, diagnostics)
+        assertEquals(0, checks)
+        assertEquals(0, writes)
+    }
+
+    @Test fun diagnosticSummaryFitsCanvasAndBackDoesNotRunSetup() {
+        val store = AndroidSetupDiagnostics.get(compose.activity)
+        store.start().record(DiagnosticStage.Connection, DiagnosticEvent.Failed,
+            failure = AdbFailure(AdbFailureReason.ConnectionRefused))
+        var backs = 0
+        compose.setContent { SetupDiagnosticScreen(SetupDiagnosticScreenProps { backs++ }) }
+        focusWindow(true)
+        compose.waitUntil(5000) { compose.onAllNodesWithText("C01", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("C01", substring = true).assertIsDisplayed()
+        row(R.string.setup_diagnostic_back).assertIsDisplayed().assertIsFocused()
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        assertEquals(1, backs)
+        store.awaitWrites()
+    }
+
     private fun row(resource: Int) = compose.onNode(hasText(compose.activity.getString(resource)) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Focused))
     private fun focusWindow(focused: Boolean) {
         compose.runOnIdle { compose.activity.window.decorView.dispatchWindowFocusChanged(focused) }

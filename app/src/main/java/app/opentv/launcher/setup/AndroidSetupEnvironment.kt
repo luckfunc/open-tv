@@ -22,6 +22,7 @@ import org.json.JSONObject
 
 internal class AndroidSetupEnvironment(private val context: Context) : SetupEnvironment {
     private val preferences = context.getSharedPreferences("self_setup", Context.MODE_PRIVATE)
+    private val diagnostics = AndroidSetupDiagnostics.get(context)
     private var autoStartName: String? = null
     override fun trace(event: String, error: Throwable?) {
         if (error == null) Log.i("OpenTVSetup", event)
@@ -29,12 +30,19 @@ internal class AndroidSetupEnvironment(private val context: Context) : SetupEnvi
     }
 
     private suspend fun execute(session: AdbSession, command: String): AdbCommandResult {
+        val attempt = diagnostics.current
+        val check = SetupDiagnostics.check(command)
+        val stage = if (command.startsWith("appops get") || command.contains(" help")) DiagnosticStage.Read else DiagnosticStage.Configure
+        attempt?.record(stage, DiagnosticEvent.Started, check)
         trace("command start=$command")
         return try {
             session.execute(command).also {
-                trace("command=$command exitCode=${it.exitCode} output=${it.output.take(1024)}")
+                attempt?.record(stage, DiagnosticEvent.Completed, check, exitCode = it.exitCode,
+                    hint = if (it.exitCode != 0) SetupDiagnostics.hint(it.output) else null)
+                trace("command=$command exitCode=${it.exitCode}")
             }
         } catch (error: Exception) {
+            if (error !is kotlinx.coroutines.CancellationException) attempt?.record(stage, DiagnosticEvent.Failed, check, failure = error)
             trace("command failed=$command", error)
             throw error
         }
@@ -46,6 +54,7 @@ internal class AndroidSetupEnvironment(private val context: Context) : SetupEnvi
     override fun legacyBehaviors() = GuardSetup.keepAdb(context)
 
     override suspend fun snapshot(session: AdbSession): SetupSnapshot = withContext(Dispatchers.IO) {
+        diagnostics.current?.record(DiagnosticStage.Read, DiagnosticEvent.Started, DiagnosticCheck.Snapshot)
         val configured = mutableSetOf<SetupOperation>()
         val before = linkedMapOf<String, String>()
         val optional = mutableSetOf<SetupOperation>()
@@ -84,6 +93,8 @@ internal class AndroidSetupEnvironment(private val context: Context) : SetupEnvi
         if (autoStartMode != null) optional += SetupOperation.AutoStart
         if (autoStartMode == "allow") configured += SetupOperation.AutoStart
         SetupSnapshot(configured, optional, before, HomeGuardService.isRunning, RevivalListener.isConnected).also {
+            diagnostics.current?.record(DiagnosticStage.Read, DiagnosticEvent.Completed, DiagnosticCheck.Snapshot,
+                guardBound = it.guardBound, listenerBound = it.listenerBound, configured = it.configured)
             trace("snapshot configured=${it.configured} persistentHomeFilter=$persistentHomeFilter guardBound=${it.guardBound} listenerBound=${it.listenerBound}")
         }
     }

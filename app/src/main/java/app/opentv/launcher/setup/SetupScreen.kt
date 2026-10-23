@@ -38,8 +38,14 @@ import kotlinx.coroutines.launch
 internal fun SetupScreen(controller: SetupController, onDismiss: () -> Unit, onOpen: (Intent) -> Unit) {
     val state by controller.state.collectAsState()
     if (state == SetupState.Closed) return
+    var showDiagnostics by remember { mutableStateOf(false) }
+    if (showDiagnostics) {
+        SetupDiagnosticScreen(SetupDiagnosticScreenProps(onBack = { showDiagnostics = false }))
+        return
+    }
     SetupContent(state, onCheck = controller::check, onConfirm = controller::confirm,
-        onCancel = controller::cancel, onDismiss = onDismiss, onOpen = onOpen)
+        onCancel = controller::cancel, onDismiss = onDismiss, onOpen = onOpen,
+        onDiagnostics = { showDiagnostics = true })
 }
 
 @Composable
@@ -50,6 +56,7 @@ internal fun SetupContent(
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
     onOpen: (Intent) -> Unit,
+    onDiagnostics: (() -> Unit)? = null,
 ) {
     if (state == SetupState.Closed) return
     val context = LocalContext.current
@@ -182,9 +189,13 @@ internal fun SetupContent(
                         Note(if (state.connected) R.string.setup_read_failed else when (state.reason) {
                             AdbFailureReason.TlsRequired -> R.string.setup_tls
                             AdbFailureReason.AuthorizationTimeout -> R.string.setup_auth_timeout
+                            AdbFailureReason.HandshakeTimeout -> R.string.setup_handshake_timeout
+                            AdbFailureReason.ConnectionRefused -> R.string.setup_connection_refused
+                            AdbFailureReason.ConnectionTimeout -> R.string.setup_connection_timeout
+                            AdbFailureReason.ConnectionDenied -> R.string.setup_connection_denied
                             else -> R.string.setup_blocked
                         })
-                        Note(R.string.setup_debug_instructions)
+                        state.reason?.let { BasicText(stringResource(R.string.setup_error_code, it.code), style = Type.Body) }
                     }
                     SetupState.Closed -> Unit
                 }
@@ -199,6 +210,7 @@ internal fun SetupContent(
                         }
                     }
                 }
+                if (state is SetupState.Intro && onDiagnostics != null) Action("diagnostics", R.string.setup_diagnostics, onDiagnostics)
                 if (busy) Action("cancel", R.string.setup_cancel, onCancel)
                 else if (verified) Action("done", R.string.setup_finish, onDismiss)
                 else {
@@ -207,7 +219,9 @@ internal fun SetupContent(
                         else -> Action("check", if (state is SetupState.Intro) R.string.setup_check else R.string.setup_retry, onCheck)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (settings != null && state !is SetupState.Review) Action("settings", R.string.setup_open_settings) { onOpen(settings) }
+                        if (onDiagnostics != null && (state is SetupState.Blocked || state is SetupState.Result)) {
+                            Action("diagnostics", R.string.setup_diagnostics, onDiagnostics)
+                        } else if (settings != null && state !is SetupState.Review) Action("settings", R.string.setup_open_settings) { onOpen(settings) }
                         Action("close", if (state is SetupState.Intro) R.string.setup_skip else R.string.setup_done, onDismiss)
                     }
                 }

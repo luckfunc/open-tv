@@ -81,7 +81,7 @@ internal class AdbIdentity(private val key: PrivateKey) {
                 require(key.modulus.bitLength() == 2048 && key.publicExponent == BigInteger.valueOf(65537))
                 AdbIdentity(key)
             } catch (failure: Exception) {
-                throw AdbFailure(AdbFailureReason.IdentityUnavailable)
+                throw AdbFailure(AdbFailureReason.IdentityUnavailable, failure)
             }
         }
     }

@@ -306,6 +306,57 @@ class AdbTransportTest {
         }
     }
 
+    @Test fun silentHandshakeIsNotReportedAsMissingAuthorization() = runBlocking {
+        val dir = java.nio.file.Files.createTempDirectory("opentv-handshake-test").toFile()
+        val store = app.opentv.launcher.setup.SetupDiagnostics(dir, emptyMap())
+        val attempt = store.start()
+        var requested = false
+        FakeAdbd { socket ->
+            read(socket)
+            assertEquals(-1, socket.getInputStream().read())
+        }.use { server ->
+            AndroidAdbConnector({ identity }, server.port, 200, diagnostic = attempt).use { connector ->
+                expectSuspendFailure(AdbFailureReason.HandshakeTimeout) { connector.connect { requested = true } }
+            }
+        }
+        assertFalse(requested)
+        assertFalse(attempt.report().contains("KeySent"))
+        store.awaitWrites()
+        dir.deleteRecursively()
+        Unit
+    }
+
+    @Test fun tlsRequirementProducesProtocolEvidenceWithoutPayload() = runBlocking {
+        val dir = java.nio.file.Files.createTempDirectory("opentv-tls-test").toFile()
+        val store = app.opentv.launcher.setup.SetupDiagnostics(dir, emptyMap())
+        val attempt = store.start()
+        FakeAdbd { socket ->
+            read(socket)
+            send(socket, AdbPacket(AdbProtocol.STLS, 1, 0))
+        }.use { server ->
+            AndroidAdbConnector({ identity }, server.port, diagnostic = attempt).use { connector ->
+                expectSuspendFailure(AdbFailureReason.TlsRequired) { connector.connect {} }
+            }
+        }
+        assertTrue(attempt.report().contains("Stls"))
+        store.awaitWrites()
+        dir.deleteRecursively()
+        Unit
+    }
+
+    @Test fun refusedConnectionPreservesItsCause() = runBlocking {
+        val port = ServerSocket(0).use { it.localPort }
+        AndroidAdbConnector({ identity }, port).use { connector ->
+            try {
+                connector.connect {}
+                fail("Expected connection refusal")
+            } catch (e: AdbFailure) {
+                assertEquals(AdbFailureReason.ConnectionRefused, e.reason)
+                assertTrue(e.cause is java.net.ConnectException)
+            }
+        }
+    }
+
     private fun connector(server: FakeAdbd, timeout: Long = 3000) = AndroidAdbConnector({ identity }, server.port, timeout)
     private fun connected() = AdbPacket(AdbProtocol.CNXN, 0x01000000, 4096, "device::\u0000".toByteArray())
     private fun expectFailure(reason: AdbFailureReason, action: () -> Unit) {
